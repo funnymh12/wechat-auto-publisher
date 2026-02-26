@@ -10,25 +10,28 @@ const { marked } = require('marked');
 // 微信公众号内联样式定义
 // ============================
 const STYLES = {
-    h1: 'font-size: 24px; font-weight: bold; color: #1a1a2e; text-align: center; margin: 30px 0 20px; line-height: 1.6;',
-    h2: 'font-size: 20px; font-weight: bold; color: #1a1a2e; border-left: 4px solid #4f46e5; padding-left: 14px; margin: 36px 0 16px; line-height: 1.6;',
-    h3: 'font-size: 18px; font-weight: bold; color: #333; margin: 24px 0 12px; line-height: 1.6;',
-    p: 'margin: 14px 0; font-size: 16px; line-height: 2; color: #2c2c2c;',
-    blockquote: 'border-left: 4px solid #ddd; padding: 12px 20px; margin: 16px 0; background: #fafafa; color: #666;',
-    blockquoteP: 'margin: 6px 0; font-size: 15px; line-height: 1.8; color: #666;',
-    code: 'background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 13px; color: #e83e8c; font-family: "Courier New", Consolas, monospace;',
-    codeBlock: 'background: #1e1e1e; color: #d4d4d4; border-radius: 8px; padding: 16px; font-family: "Courier New", Consolas, monospace; font-size: 13px; margin: 16px 0; white-space: pre-wrap; line-height: 1.8; overflow-x: auto;',
-    ul: 'margin: 14px 0; padding-left: 0; list-style: none;',
-    ol: 'margin: 14px 0; padding-left: 0; list-style: none;',
-    li: 'margin: 8px 0; font-size: 15px; line-height: 2; padding-left: 16px;',
-    strong: 'color: #1a1a2e; font-weight: bold;',
-    em: 'font-style: italic; color: #555;',
-    a: 'color: #4f46e5; text-decoration: none; border-bottom: 1px solid #4f46e5;',
-    hr: 'border: none; border-top: 1px solid #eee; margin: 30px 0;',
-    img: 'max-width: 100%; border-radius: 8px; margin: 16px 0; display: block;',
-    table: 'width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px;',
-    th: 'background: #f0f0f0; padding: 10px 12px; text-align: left; border: 1px solid #ddd; font-weight: bold;',
-    td: 'padding: 10px 12px; border: 1px solid #ddd;',
+    // ── 标题 ──
+    h1: 'font-size: 20px; font-weight: 700; color: #1a1a2e; text-align: center; margin: 36px 0 24px; line-height: 1.5; letter-spacing: 0.5px;',
+    h2: 'font-size: 16px; font-weight: 700; color: #1a1a2e; border-left: 3px solid #2b5cd9; padding-left: 12px; margin: 40px 0 16px; line-height: 1.5; letter-spacing: 0.3px;',
+    h3: 'font-size: 15px; font-weight: 700; color: #333; margin: 28px 0 12px; line-height: 1.5;',
+    // ── 正文：14px + 行高 2.0 = 微信移动端最佳阅读体验 ──
+    p: 'margin: 8px 0 18px; font-size: 14px; line-height: 2; color: #333; letter-spacing: 0.3px;',
+    blockquote: 'border-left: 3px solid #e0e0e0; padding: 10px 16px; margin: 20px 0; background: #fafbfc; color: #666; border-radius: 0 6px 6px 0;',
+    blockquoteP: 'margin: 4px 0; font-size: 13px; line-height: 1.8; color: #777;',
+    code: 'background: #f4f5f7; padding: 2px 5px; border-radius: 3px; font-size: 13px; color: #c7254e; font-family: "Courier New", Consolas, monospace;',
+    codeBlock: 'background: #282c34; color: #abb2bf; border-radius: 6px; padding: 14px 16px; font-family: "Courier New", Consolas, monospace; font-size: 12px; margin: 20px 0; white-space: pre-wrap; line-height: 1.7; overflow-x: auto;',
+    // ── 列表 ──
+    ul: 'margin: 8px 0 20px; padding-left: 0; list-style: none;',
+    ol: 'margin: 8px 0 20px; padding-left: 0; list-style: none;',
+    li: 'margin: 6px 0; font-size: 14px; line-height: 2; color: #333; padding-left: 0;',
+    strong: 'color: #1a1a2e; font-weight: 700;',
+    em: 'font-style: italic; color: #666;',
+    a: 'color: #2b5cd9; text-decoration: none; border-bottom: 1px solid rgba(43,92,217,0.3);',
+    hr: 'border: none; border-top: 1px solid #eaeaea; margin: 40px 0;',
+    img: 'max-width: 100%; border-radius: 6px; margin: 20px 0; display: block;',
+    table: 'width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px;',
+    th: 'background: #f4f5f7; padding: 8px 10px; text-align: left; border: 1px solid #e5e5e5; font-weight: 600; font-size: 13px;',
+    td: 'padding: 8px 10px; border: 1px solid #e5e5e5; font-size: 13px;',
 };
 
 // ============================
@@ -71,8 +74,12 @@ const renderer = {
         const style = ordered ? STYLES.ol : STYLES.ul;
         let body = '';
         items.forEach((item, i) => {
-            const prefix = ordered ? `${i + 1}. ` : '• ';
-            const content = this.parser.parseInline(item.tokens);
+            const prefix = ordered ? `${i + 1}. ` : '· ';
+            // parse() 生成完整 HTML，然后剥掉 <p> 块级标签使内容与 bullet 同行
+            let content = this.parser.parse(item.tokens)
+                .replace(/<p[^>]*>/gi, '')
+                .replace(/<\/p>/gi, '')
+                .trim();
             body += `<li style="${STYLES.li}">${prefix}${content}</li>\n`;
         });
         return `<${tag} style="${style}">${body}</${tag}>\n`;
@@ -182,7 +189,7 @@ function md2html(markdown, options = {}) {
     max-width: 680px;
     margin: 40px auto;
     font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-    font-size: 16px;
+    font-size: 14px;
     line-height: 2;
     color: #2c2c2c;
     padding: 0 20px;

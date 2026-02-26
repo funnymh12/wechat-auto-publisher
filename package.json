@@ -1,6 +1,6 @@
 {
     "name": "wechat-auto-publisher",
-    "version": "1.0.0",
+    "version": "2.1.0",
     "description": "AI 驱动的公众号文章自动发布工具 - 自动写文章、配封面图、发布到微信公众号",
     "main": "publish.js",
     "scripts": {
