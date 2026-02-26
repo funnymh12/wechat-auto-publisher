@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>文章预览</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            max-width: 680px;
+            margin: 40px auto;
+            font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            font-size: 16px;
+            line-height: 2;
+            color: #333;
+            padding: 0 20px;
+        }
+
+        /*
+    ⚠️ 重要说明：
+    这个 <style> 块只在本地预览时生效。
+    粘贴到微信编辑器后，微信会剥离所有 CSS class。
+    因此：每个元素上必须同时写 inline style，不能只靠 class。
+  */
+        h2 {
+            font-size: 20px;
+            font-weight: bold;
+            color: #1a1a2e;
+            border-left: 4px solid #4f46e5;
+            padding-left: 14px;
+            margin: 36px 0 16px;
+        }
+
+        p {
+            margin: 14px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <!--
+  ==========================================================
+  📝 使用说明
+  - 在 #article 里写你的文章正文
+  - 每个视觉元素必须写 style=" ... " 内联样式
+  - 不要依赖 class，微信会删除它
+  - 保存后运行 node publish.js 自动发布
+  ==========================================================
+-->
+    <div id="article">
+
+        <!-- ✏️ 副标题/引子 -->
+        <p style="font-size: 15px; color: #888; text-align: center; margin-bottom: 24px; font-style: italic;">
+            在这里写副标题或一句引子</p>
+
+        <!-- 🎨 Hero 横幅 -->
+        <section
+            style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%); border-radius: 14px; padding: 28px 24px; color: white; margin: 20px 0;">
+            <p style="font-size: 11px; letter-spacing: 3px; opacity: 0.5; margin: 0 0 10px;">TOOL / 工具</p>
+            <h3 style="font-size: 24px; margin: 0 0 10px; color: white; font-weight: bold;">项目名称</h3>
+            <p style="font-size: 14px; opacity: 0.85; margin: 4px 0; line-height: 1.8;">一句话介绍项目</p>
+        </section>
+
+        <!-- 📖 章节 -->
+        <h2
+            style="font-size: 20px; font-weight: bold; color: #1a1a2e; border-left: 4px solid #4f46e5; padding-left: 14px; margin: 36px 0 16px;">
+            为什么做这个？</h2>
+        <p>在这里写开发背景和动机...</p>
+
+        <!-- ✅ 功能列表盒子 -->
+        <section
+            style="background: #fafafa; border-radius: 10px; padding: 20px 24px; margin: 16px 0; border: 1px solid #eee;">
+            <p style="margin: 0 0 14px; font-weight: bold; font-size: 15px; color: #333;">⚡ 核心功能</p>
+            <p style="margin: 8px 0; font-size: 15px; line-height: 1.8;">✅ <strong>功能一</strong> — 说明</p>
+            <p style="margin: 8px 0; font-size: 15px; line-height: 1.8;">✅ <strong>功能二</strong> — 说明</p>
+        </section>
+
+        <!-- 📊 数据/成果展示（深色） -->
+        <section
+            style="background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%); border-radius: 10px; padding: 20px 24px; margin: 24px 0; color: white;">
+            <p style="font-size: 14px; font-weight: bold; color: #a5b4fc; margin: 0 0 14px;">📊 实测数据</p>
+            <p style="margin: 8px 0; font-size: 15px; line-height: 1.8;">🗓️ 开发周期：X 天</p>
+            <p style="margin: 8px 0; font-size: 15px; line-height: 1.8;">✅ 已交付：XXX</p>
+        </section>
+
+        <!-- 💬 代码块 -->
+        <section
+            style="background: #1e1e1e; color: #d4d4d4; border-radius: 8px; padding: 16px; font-family: 'Courier New', Consolas, monospace; font-size: 13px; margin: 10px 0; white-space: pre-wrap; line-height: 1.8;">
+            node publish.js</section>
+
+        <!-- 🔗 CTA 按钮区域 -->
+        <section
+            style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); border-radius: 14px; padding: 22px 24px; color: white; margin: 30px 0; text-align: center;">
+            <p style="font-size: 16px; font-weight: bold; margin: 0 0 8px;">🔗 获取工具</p>
+            <p style="font-size: 14px; opacity: 0.9; margin: 0;">填写你的 GitHub 链接或其他获取方式</p>
+        </section>
+
+    </div>
+</body>
+
+</html>

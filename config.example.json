@@ -1,0 +1,12 @@
+{
+    "articleTitle": "文章标题",
+    "unsplashQuery": "productivity workspace tools minimal",
+    "unsplashAccessKey": "86Fd3sFsQ1qYji0v5GUgGnc2x9BK_TIPWAsaHPXBFTc",
+    "qiniu": {
+        "accessKey": "你的七牛云 Access Key",
+        "secretKey": "你的七牛云 Secret Key",
+        "bucket": "存储空间名称",
+        "domain": "https://你的CDN域名",
+        "region": "as0"
+    }
+}

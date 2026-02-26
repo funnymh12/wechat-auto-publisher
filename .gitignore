@@ -1,0 +1,11 @@
+# 忽略敏感配置和运行产物
+config.json
+auth.json
+article_preview.html
+cover_temp.jpg
+node_modules/
+package-lock.json
+output/
+*.log
+.DS_Store
+Thumbs.db

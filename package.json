@@ -1,0 +1,16 @@
+{
+    "name": "wechat-auto-publisher",
+    "version": "1.0.0",
+    "description": "AI 驱动的公众号文章自动发布工具 - 自动写文章、配封面图、发布到微信公众号",
+    "main": "publish.js",
+    "scripts": {
+        "start": "node publish.js",
+        "install-browser": "npx playwright install chromium"
+    },
+    "dependencies": {
+        "cheerio": "^1.0.0",
+        "crypto-js": "^4.2.0",
+        "node-fetch": "^2.7.0",
+        "playwright": "^1.49.0"
+    }
+}
