@@ -1,132 +1,119 @@
 /**
- * publish.js — 公众号文章自动发布工具
+ * publish.js — 公众号文章自动发布工具 v2
  *
- * 使用前：
- *   1. cp config.example.json config.json 并填写配置
- *   2. npm install
- *   3. 把你的文章内容写到 article_preview.html 的 #article 区域
- *   4. 设置本文件顶部的 ARTICLE_TITLE
- *   5. node publish.js
+ * 新功能：
+ *   - 接受 Markdown 文件作为输入（article.md）
+ *   - 自动将 MD 转为微信兼容的内联样式 HTML
+ *   - Unsplash 封面图插入文章头部
+ *   - 文末自动生成 Changelog（时间、字数、耗时）
+ *   - 七牛云上传不再必须，封面用本地文件即可
  *
- * 流程：
- *   Unsplash 获取封面图 → 上传七牛云 → 打开微信编辑器
- *   → 填标题 → 粘贴正文 → 上传封面 → 保持浏览器开着等你检查
+ * 使用：
+ *   1. 把文章写到 article.md
+ *   2. 在 config.json 中填写配置
+ *   3. node publish.js
  */
 const fs = require('fs');
 const path = require('path');
 const fetch = require('node-fetch');
-const CryptoJS = require('crypto-js');
 const { chromium } = require('playwright');
+const { md2html, countWords } = require('./src/md2html');
 
-// ===== 每次发布前修改这里 =====
-const ARTICLE_TITLE = '在这里填写文章标题';
-// ==============================
-
+// ===== 路径 =====
 const CONFIG_PATH = path.join(__dirname, 'config.json');
+const ARTICLE_MD = path.join(__dirname, 'article.md');
 const PREVIEW_HTML = path.join(__dirname, 'article_preview.html');
 const AUTH_STATE = path.join(__dirname, 'auth.json');
 const COVER_TEMP = path.join(__dirname, 'cover_temp.jpg');
 
-// 读取配置
+// ===== 读取配置 =====
 if (!fs.existsSync(CONFIG_PATH)) {
-    console.error('❌ 未找到 config.json，请先复制 config.example.json 并填写配置');
+    console.error('❌ 未找到 config.json，请先：cp config.example.json config.json');
     process.exit(1);
 }
 const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
 
-// =========================================
-// 七牛云工具
-// =========================================
-function urlSafeBase64(str) {
-    return Buffer.from(str).toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
+// ===== 读取文章 =====
+if (!fs.existsSync(ARTICLE_MD)) {
+    console.error('❌ 未找到 article.md，请先写好文章');
+    process.exit(1);
 }
 
-function qiniuToken() {
-    const q = config.qiniu;
-    const deadline = Math.floor(Date.now() / 1000) + 3600;
-    const policy = JSON.stringify({ scope: q.bucket, deadline });
-    const encoded = urlSafeBase64(policy);
-    const sign = CryptoJS.HmacSHA1(encoded, q.secretKey)
-        .toString(CryptoJS.enc.Base64).replace(/\+/g, '-').replace(/\//g, '_');
-    return `${q.accessKey}:${sign}:${encoded}`;
-}
-
-function qiniuUploadUrl() {
-    const map = {
-        z0: 'https://upload.qiniup.com', z1: 'https://upload-z1.qiniup.com',
-        z2: 'https://upload-z2.qiniup.com', na0: 'https://upload-na0.qiniup.com',
-        as0: 'https://upload-as0.qiniup.com',
-    };
-    return map[(config.qiniu.region || 'z0').toLowerCase()] || map.z0;
-}
-
-async function uploadToQiniu(buffer, ext) {
-    const token = qiniuToken();
-    const key = `wx_cover_${Date.now()}.${ext}`;
-    const boundary = '----QiniuBound' + Date.now();
-    const textPart = `--${boundary}\r\nContent-Disposition: form-data; name="token"\r\n\r\n${token}\r\n`
-        + `--${boundary}\r\nContent-Disposition: form-data; name="key"\r\n\r\n${key}\r\n`;
-    const fileHeader = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${key}"\r\nContent-Type: application/octet-stream\r\n\r\n`;
-    const body = Buffer.concat([Buffer.from(textPart), Buffer.from(fileHeader), buffer, Buffer.from(`\r\n--${boundary}--\r\n`)]);
-
-    const res = await fetch(qiniuUploadUrl(), {
-        method: 'POST',
-        headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
-        body,
-    });
-    if (!res.ok) throw new Error(`Qiniu upload failed: ${res.status} - ${await res.text()}`);
-    const json = await res.json();
-    let domain = config.qiniu.domain.replace(/\/+$/, '');
-    if (!domain.startsWith('http')) domain = 'https://' + domain;
-    return `${domain}/${json.key}`;
-}
-
-// =========================================
-// 主流程
-// =========================================
 async function main() {
+    const startTime = Date.now();
+
     console.log('\n╔═══════════════════════════════════════════════════╗');
-    console.log('║   🤖 公众号文章自动发布工具 wechat-auto-publisher  ║');
+    console.log('║   🤖 公众号文章自动发布工具 v2 (Markdown 版)      ║');
     console.log('╚═══════════════════════════════════════════════════╝\n');
 
-    // ── Step 1: Unsplash 获取封面图 ──
+    // ── Step 1: 读取 Markdown ──
+    console.log('📖 读取文章...');
+    const markdown = fs.readFileSync(ARTICLE_MD, 'utf-8');
+
+    // 提取标题：取 Markdown 中第一个 # 标题
+    const titleMatch = markdown.match(/^#\s+(.+)$/m);
+    const articleTitle = config.articleTitle || (titleMatch ? titleMatch[1].trim() : '未命名文章');
+    const wordCount = countWords(markdown);
+    console.log(`   标题: "${articleTitle}"`);
+    console.log(`   字数: 约 ${wordCount} 字\n`);
+
+    // ── Step 2: Unsplash 获取封面图 ──
     let coverLocalPath = null;
-    let coverQiniuUrl = null;
-
+    let coverPhotographer = null;
     const query = config.unsplashQuery || 'productivity workspace minimal';
-    console.log(`🖼️  Unsplash 配图（关键词："${query}"）...`);
 
-    try {
-        const r = await fetch(
-            `https://api.unsplash.com/photos/random?query=${encodeURIComponent(query)}&orientation=landscape&content_filter=high`,
-            { headers: { Authorization: `Client-ID ${config.unsplashAccessKey}`, 'Accept-Version': 'v1' } }
-        );
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const data = await r.json();
+    if (config.unsplashAccessKey) {
+        console.log(`🖼️  Unsplash 配图（"${query}"）...`);
+        try {
+            const r = await fetch(
+                `https://api.unsplash.com/photos/random?query=${encodeURIComponent(query)}&orientation=landscape&content_filter=high`,
+                { headers: { Authorization: `Client-ID ${config.unsplashAccessKey}`, 'Accept-Version': 'v1' } }
+            );
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const data = await r.json();
+            coverPhotographer = data.user?.name || 'Unsplash';
+            console.log(`   📸 摄影师: ${coverPhotographer}`);
 
-        console.log(`   摄影师：${data.user?.name || 'Unsplash'}`);
-
-        const imgRes = await fetch(data.urls.regular);
-        const buffer = Buffer.from(await imgRes.arrayBuffer());
-        fs.writeFileSync(COVER_TEMP, buffer);
-        coverLocalPath = COVER_TEMP;
-        console.log('   ✅ 图片已下载\n');
-
-        console.log('   ⬆️  上传七牛云...');
-        coverQiniuUrl = await uploadToQiniu(buffer, 'jpg');
-        console.log(`   ✅ ${coverQiniuUrl}\n`);
-    } catch (err) {
-        console.warn(`   ⚠️  封面图失败：${err.message}（将跳过配图）\n`);
+            const imgRes = await fetch(data.urls.regular);
+            const buffer = Buffer.from(await imgRes.arrayBuffer());
+            fs.writeFileSync(COVER_TEMP, buffer);
+            coverLocalPath = COVER_TEMP;
+            console.log('   ✅ 封面图已下载\n');
+        } catch (err) {
+            console.warn(`   ⚠️  封面图获取失败: ${err.message}，将跳过\n`);
+        }
+    } else {
+        console.log('⏭️  未配置 Unsplash API Key，跳过自动配图\n');
     }
 
-    // ── Step 2: 登录 ──
+    // ── Step 3: 转换 MD → HTML ──
+    console.log('🔄 Markdown → HTML 转换...');
+    const elapsedMin = ((Date.now() - startTime) / 60000).toFixed(1);
+    const now = new Date();
+    const timeStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    const htmlContent = md2html(markdown, {
+        coverImagePath: coverLocalPath ? `file:///${coverLocalPath.replace(/\\/g, '/')}` : null,
+        stats: {
+            completedAt: timeStr,
+            wordCount: wordCount,
+            duration: `${elapsedMin} 分钟`,
+            coverSource: coverPhotographer ? `Unsplash / ${coverPhotographer}` : null,
+        },
+    });
+
+    // 写入预览文件
+    fs.writeFileSync(PREVIEW_HTML, htmlContent, 'utf-8');
+    console.log(`   ✅ 已生成 article_preview.html (${htmlContent.length} 字符)\n`);
+
+    // ── Step 4: 登录微信 ──
     const browser = await chromium.launch({ headless: false, args: ['--disable-blink-features=AutomationControlled'] });
 
     try {
         let context, page;
 
         if (fs.existsSync(AUTH_STATE)) {
-            console.log('🔐 复用已保存的登录状态...');
+            console.log('🔐 复用登录状态...');
             context = await browser.newContext({ storageState: AUTH_STATE });
             page = await context.newPage();
             await page.goto('https://mp.weixin.qq.com/', { waitUntil: 'domcontentloaded' });
@@ -142,16 +129,16 @@ async function main() {
             }
             console.log('   ✅ 登录有效\n');
         } else {
-            console.log('📱 请扫码登录公众平台...\n');
+            console.log('📱 请扫码登录...\n');
             context = await browser.newContext();
             page = await context.newPage();
             await page.goto('https://mp.weixin.qq.com/', { waitUntil: 'domcontentloaded' });
             await page.waitForURL(/token=/, { timeout: 120000 });
             fs.writeFileSync(AUTH_STATE, JSON.stringify(await context.storageState()));
-            console.log('✅ 登录成功，状态已保存\n');
+            console.log('   ✅ 登录成功\n');
         }
 
-        // ── Step 3: 提取 Token ──
+        // 提取 Token
         const token = await page.evaluate(() => {
             const m = window.location.href.match(/token=(\d+)/);
             if (m) return m[1];
@@ -159,28 +146,18 @@ async function main() {
                 const mt = (s.textContent || '').match(/token\s*[:=]\s*["']?(\d{5,})["']?/);
                 if (mt) return mt[1];
             }
-            for (const a of document.querySelectorAll('a[href*="token="]')) {
-                const mt = a.href.match(/token=(\d+)/);
-                if (mt) return mt[1];
-            }
             return null;
         });
         if (!token) { console.error('❌ 无法获取 token'); return; }
         console.log(`🔑 Token: ${token.substring(0, 6)}***\n`);
 
-        // ── Step 4: 复制文章到剪贴板 ──
-        if (!fs.existsSync(PREVIEW_HTML)) {
-            console.error(`❌ 未找到 article_preview.html，请先创建文章内容`);
-            return;
-        }
-
+        // ── Step 5: 复制文章到剪贴板 ──
         console.log('📋 复制文章到剪贴板...');
         const previewPage = await context.newPage();
         await previewPage.goto('file:///' + PREVIEW_HTML.replace(/\\/g, '/'), { waitUntil: 'load' });
         await previewPage.waitForTimeout(1000);
         await previewPage.evaluate(() => {
             const article = document.getElementById('article');
-            if (!article) { console.error('❌ article_preview.html 中未找到 #article 元素'); return; }
             const range = document.createRange();
             range.selectNodeContents(article);
             window.getSelection().removeAllRanges();
@@ -190,7 +167,7 @@ async function main() {
         await previewPage.close();
         console.log('   ✅ 已复制\n');
 
-        // ── Step 5: 打开微信编辑器 ──
+        // ── Step 6: 打开编辑器 ──
         console.log('📝 打开图文编辑器...');
         await page.goto(
             `https://mp.weixin.qq.com/cgi-bin/appmsg?t=media/appmsg_edit&action=edit&type=77&token=${token}&lang=zh_CN`,
@@ -198,14 +175,14 @@ async function main() {
         );
         await page.waitForTimeout(4000);
 
-        // ── Step 6: 填标题 ──
-        for (const sel of ['#title', 'textarea[placeholder*="标题"]', '.title_input textarea']) {
+        // 填标题
+        for (const sel of ['#title', 'textarea[placeholder*="标题"]']) {
             const el = await page.$(sel);
-            if (el) { await el.click(); await el.fill(ARTICLE_TITLE); console.log('✅ 标题已填入\n'); break; }
+            if (el) { await el.click(); await el.fill(articleTitle); console.log(`✅ 标题: "${articleTitle}"\n`); break; }
         }
         await page.waitForTimeout(1000);
 
-        // ── Step 7: 粘贴正文 ──
+        // 粘贴正文
         console.log('📝 粘贴正文...');
         for (const sel of ['#edui1_iframeholder [contenteditable="true"]', '[contenteditable="true"]', '.edui-body-container']) {
             const el = await page.$(sel);
@@ -222,7 +199,7 @@ async function main() {
             }
         }
 
-        // ── Step 8: 上传封面图 ──
+        // ── Step 7: 上传封面图 ──
         if (coverLocalPath && fs.existsSync(coverLocalPath)) {
             console.log('🖼️  上传封面图...');
             try {
@@ -230,30 +207,32 @@ async function main() {
                 if (fileInput) {
                     await fileInput.setInputFiles(coverLocalPath);
                     await page.waitForTimeout(3000);
-                    // 点击裁剪确认（如有）
                     for (const sel of ['.btn_confirm', 'button:has-text("完成")', 'button:has-text("确定")']) {
                         const btn = await page.$(sel);
                         if (btn) { await btn.click(); await page.waitForTimeout(1000); break; }
                     }
                     console.log('   ✅ 封面已上传\n');
                 } else {
-                    console.log('   ⚠️  未找到封面上传入口，请手动上传封面\n');
+                    console.log('   ⚠️  未找到封面上传入口，请手动上传\n');
                 }
             } catch (err) {
-                console.warn(`   ⚠️  封面上传出错：${err.message}\n`);
+                console.warn(`   ⚠️  封面上传出错: ${err.message}\n`);
             }
         }
 
-        // ── 完成 ──
+        // 完成
+        const totalTime = ((Date.now() - startTime) / 1000).toFixed(0);
         console.log('═══════════════════════════════════════════════════');
-        console.log('  ✅ 全部自动步骤完成！');
+        console.log('  ✅ 全部完成！');
+        console.log(`  ⏱️  总耗时: ${totalTime} 秒`);
+        console.log(`  📝 字数: ${wordCount} 字`);
         console.log('');
         console.log('  请在浏览器中：');
         console.log('    1. 检查标题、正文、封面图');
         console.log('    2. 填写摘要（选填）');
         console.log('    3. 点击「保存草稿」或「群发」');
-        if (coverQiniuUrl) console.log(`\n  封面图永久链接: ${coverQiniuUrl}`);
-        console.log('\n  按 Ctrl+C 关闭脚本');
+        console.log('');
+        console.log('  按 Ctrl+C 关闭脚本');
         console.log('═══════════════════════════════════════════════════');
 
         await page.waitForTimeout(600000);

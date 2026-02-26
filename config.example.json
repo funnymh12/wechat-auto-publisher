@@ -1,12 +1,13 @@
 {
-    "articleTitle": "文章标题",
+    "articleTitle": "",
     "unsplashQuery": "productivity workspace tools minimal",
-    "unsplashAccessKey": "86Fd3sFsQ1qYji0v5GUgGnc2x9BK_TIPWAsaHPXBFTc",
+    "unsplashAccessKey": "你的 Unsplash Access Key（从 unsplash.com/developers 免费获取）",
     "qiniu": {
-        "accessKey": "你的七牛云 Access Key",
-        "secretKey": "你的七牛云 Secret Key",
-        "bucket": "存储空间名称",
-        "domain": "https://你的CDN域名",
-        "region": "as0"
+        "_comment": "七牛云配置是可选的，不配置也能正常使用",
+        "accessKey": "",
+        "secretKey": "",
+        "bucket": "",
+        "domain": "",
+        "region": "z0"
     }
 }
